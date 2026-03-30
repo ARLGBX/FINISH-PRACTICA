@@ -158,7 +158,7 @@ import { ref, onMounted, watch } from 'vue'
 import {
   doc, getDoc, setDoc, updateDoc, collection,
   query, where, getDocs, deleteDoc,
-  orderBy, serverTimestamp
+  serverTimestamp
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { updateProfile as updateFirebaseProfile } from 'firebase/auth'
@@ -281,8 +281,7 @@ const loadUserReviews = async () => {
   try {
     const reviewsQuery = query(
         collection(db, 'reviews'),
-        where('userId', '==', props.user.uid),
-        orderBy('createdAt', 'desc')
+        where('userId', '==', props.user.uid)
     )
 
     const snapshot = await getDocs(reviewsQuery)
@@ -290,6 +289,12 @@ const loadUserReviews = async () => {
       id: doc.id,
       ...doc.data()
     }))
+
+    userReviews.value.sort((a, b) => {
+      const dateA = a.createdAt?.toDate?.() || new Date(0)
+      const dateB = b.createdAt?.toDate?.() || new Date(0)
+      return dateB - dateA
+    })
 
     stats.value.totalReviews = userReviews.value.length
   } catch (error) {
