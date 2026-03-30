@@ -259,6 +259,41 @@ const toggleFavorite = async () => {
 }
 
 
+const addToWatchlist = async () => {
+  if (!user.value) {
+    alert('Войдите в аккаунт, чтобы добавить в "Смотреть позже"')
+    return
+  }
+
+  try {
+    const existingQuery = query(
+      collection(db, 'watchlist'),
+      where('userId', '==', user.value.uid),
+      where('movieId', '==', movieId)
+    )
+    const existingSnapshot = await getDocs(existingQuery)
+    if (!existingSnapshot.empty) {
+      alert('Фильм уже добавлен в "Смотреть позже"')
+      return
+    }
+
+    await addDoc(collection(db, 'watchlist'), {
+      userId: user.value.uid,
+      movieId: movieId,
+      title: movie.value.title,
+      poster: movie.value.poster,
+      year: movie.value.year,
+      duration: movie.value.duration,
+      addedAt: serverTimestamp()
+    })
+    alert('Фильм добавлен в "Смотреть позже"')
+  } catch (error) {
+    console.error('Ошибка:', error)
+    alert('Ошибка при добавлении фильма в список')
+  }
+}
+
+
 const checkUserRating = async () => {
   if (!user.value) return
 
