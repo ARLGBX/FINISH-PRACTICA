@@ -5,7 +5,11 @@
         <div class="logo" @click="resetFilters">NETFLIX</div>
         <div class="nav-links">
           <router-link to="/profile" class="nav-link">Мой профиль</router-link>
-          <router-link v-if="isAdmin" to="/admin" class="nav-link admin-link">🔧 Админка</router-link>
+          <router-link to="/watchlist" class="nav-link">Смотреть позже</router-link>
+          <button class="nav-link favorites-nav-btn" @click="showFavoritesOnly = !showFavoritesOnly" :class="{ active: showFavoritesOnly }">
+            {{ showFavoritesOnly ? '❤️ Избранное' : '🤍 Избранное' }}
+          </button>
+          <router-link v-if="isAdmin" to="/admin" class="nav-link admin-link">Админка</router-link>
         </div>
       </div>
 
@@ -23,7 +27,7 @@
 
         <div class="filter-sort-container">
           <button class="filter-btn" @click="showFilters = !showFilters">
-            ⚙️ Фильтры
+            Фильтры
           </button>
           <select v-model="sortBy" class="sort-select" @change="handleSortChange">
             <option value="rating_desc">По рейтингу ↓</option>
@@ -111,7 +115,7 @@
           Показать все
         </button>
         <button v-else class="show-favorites" @click="showFavoritesOnly = true">
-          ⭐ Избранное
+          Избранное
         </button>
       </div>
     </div>
@@ -595,6 +599,24 @@ onMounted(() => {
 }
 
 .nav-links .active {
+  color: white;
+}
+
+.favorites-nav-btn {
+  background: none;
+  border: none;
+  color: #ddd;
+  font-size: 15.5px;
+  margin-right: 25px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.favorites-nav-btn.active {
+  color: #e50914;
+}
+
+.favorites-nav-btn:hover {
   color: white;
 }
 

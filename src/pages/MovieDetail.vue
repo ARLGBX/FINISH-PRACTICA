@@ -118,7 +118,7 @@
 
       <div v-if="loadingReviews" class="loading">Загрузка отзывов...</div>
       <div v-else-if="reviews.length === 0" class="empty-state">
-        <p>😊 Пока нет отзывов. Будьте первым!</p>
+        <p>Пока нет отзывов. Будьте первым!</p>
       </div>
       <div v-else class="reviews-list">
         <div v-for="review in reviews" :key="review.id" class="review">
@@ -177,7 +177,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   doc, getDoc, updateDoc, collection,
   query, where, getDocs, addDoc, deleteDoc,
-  orderBy, serverTimestamp, increment, setDoc
+  orderBy, serverTimestamp, increment, setDoc, limit
 } from 'firebase/firestore'
 import { db, auth } from '../firebase/config.js'
 import { onAuthStateChanged } from 'firebase/auth'
@@ -231,12 +231,29 @@ const formatDate = (timestamp) => {
 
 onAuthStateChanged(auth, (currentUser) => {
   user.value = currentUser
-  console.log('Пользователь авторизован:', currentUser?.email)
   if (currentUser) {
     checkUserRating()
+    checkUserFavorite()
   }
 })
 
+
+const checkUserFavorite = async () => {
+  if (!user.value) return
+
+  try {
+    const userFavoritesRef = doc(db, 'userFavorites', user.value.uid)
+    const favoritesDoc = await getDoc(userFavoritesRef)
+    if (favoritesDoc.exists()) {
+      const favoriteIds = favoritesDoc.data().movieIds || []
+      movie.value.isFavorite = favoriteIds.includes(movieId)
+    } else {
+      movie.value.isFavorite = false
+    }
+  } catch (error) {
+    console.error('Ошибка загрузки избранного:', error)
+  }
+}
 
 const toggleFavorite = async () => {
   if (!user.value) {
@@ -248,12 +265,25 @@ const toggleFavorite = async () => {
   movie.value.isFavorite = newFavoriteStatus
 
   try {
-    const movieRef = doc(db, 'movies', movieId)
-    await updateDoc(movieRef, {
-      isFavorite: newFavoriteStatus
-    })
+    const userFavoritesRef = doc(db, 'userFavorites', user.value.uid)
+    const favoritesDoc = await getDoc(userFavoritesRef)
+    let favoriteIds = []
+
+    if (favoritesDoc.exists()) {
+      favoriteIds = favoritesDoc.data().movieIds || []
+    }
+
+    if (newFavoriteStatus) {
+      if (!favoriteIds.includes(movieId)) {
+        favoriteIds.push(movieId)
+      }
+    } else {
+      favoriteIds = favoriteIds.filter(id => id !== movieId)
+    }
+
+    await setDoc(userFavoritesRef, { movieIds: favoriteIds })
   } catch (error) {
-    console.error("Ошибка:", error)
+    console.error('Ошибка обновления избранного:', error)
     movie.value.isFavorite = !newFavoriteStatus
   }
 }
@@ -379,7 +409,6 @@ const submitReview = async () => {
       createdAt: serverTimestamp()
     }
 
-    console.log('Добавление отзыва:', reviewData)
     await addDoc(collection(db, 'reviews'), reviewData)
 
     const movieRef = doc(db, 'movies', movieId)
@@ -403,34 +432,25 @@ const submitReview = async () => {
 const loadReviews = async () => {
   loadingReviews.value = true
   try {
-    console.log('Загрузка отзывов для фильма:', movieId)
-
-    
     const reviewsQuery = query(
         collection(db, 'reviews'),
         where('movieId', '==', movieId)
-        
     )
 
     const snapshot = await getDocs(reviewsQuery)
-    console.log('Найдено отзывов:', snapshot.size)
 
     reviews.value = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }))
 
-    
     reviews.value.sort((a, b) => {
       const dateA = a.createdAt?.toDate?.() || new Date(0)
       const dateB = b.createdAt?.toDate?.() || new Date(0)
       return dateB - dateA
     })
-
-    console.log('Отзывы загружены:', reviews.value.length)
   } catch (error) {
     console.error('Ошибка загрузки отзывов:', error)
-    alert('Ошибка загрузки отзывов. Пожалуйста, создайте индекс в Firebase Console.')
   } finally {
     loadingReviews.value = false
   }
@@ -527,7 +547,6 @@ onMounted(async () => {
   if (!movieId) return
 
   try {
-    console.log('Загрузка фильма с ID:', movieId)
     const docRef = doc(db, 'movies', movieId)
     const docSnap = await getDoc(docRef)
 
@@ -545,14 +564,15 @@ onMounted(async () => {
         ageRating: data.ageRating || "16",
         genre: data.genre || "Драма",
         poster: data.poster || "https://via.placeholder.com/300x450",
-        isFavorite: data.isFavorite || false,
+        isFavorite: false,
         trailerUrl: data.trailerUrl || ""
       }
 
-      console.log('Фильм загружен:', movie.value.title)
       await loadSimilarMovies()
+      if (user.value) {
+        await checkUserFavorite()
+      }
     } else {
-      console.log('Фильм не найден')
       movie.value.title = "Фильм не найден"
     }
   } catch (error) {
